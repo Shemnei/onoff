@@ -404,9 +404,13 @@ where
         let mut words = words.peekable();
 
         let color = if words.peek().is_some() {
-            Some(C::try_parse(&mut words).map_err(|err| {
-                Error::with_message(ErrorKind::InvalidColor, line_index, err.to_string())
-            })?)
+            if let Some(res) = C::try_parse(&mut words) {
+                Some(res.map_err(|err| {
+                    Error::with_message(ErrorKind::InvalidColor, line_index, err.to_string())
+                })?)
+            } else {
+                None
+            }
         } else {
             None
         };
