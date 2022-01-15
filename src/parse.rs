@@ -1,6 +1,5 @@
 use std::borrow::Cow;
-use std::iter::Enumerate;
-use std::iter::Peekable;
+use std::iter::{Enumerate, Peekable};
 use std::str::Lines;
 
 use crate::colorformat::ColorFormat;
@@ -10,435 +9,441 @@ use crate::vertex::{Vertex, VertexRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Error {
-    kind: ErrorKind,
-    line_index: usize,
-    message: Option<Cow<'static, str>>,
+	kind: ErrorKind,
+	line_index: usize,
+	message: Option<Cow<'static, str>>,
 }
 
 impl Error {
-    pub fn new(kind: ErrorKind, line_index: usize, message: Option<Cow<'static, str>>) -> Self {
-        Self {
-            kind,
-            line_index,
-            message,
-        }
-    }
+	pub fn new(
+		kind: ErrorKind,
+		line_index: usize,
+		message: Option<Cow<'static, str>>,
+	) -> Self {
+		Self { kind, line_index, message }
+	}
 
-    pub fn with_message<M: Into<Cow<'static, str>>, O: Into<Option<M>>>(
-        kind: ErrorKind,
-        line_index: usize,
-        message: O,
-    ) -> Self {
-        Self {
-            kind,
-            line_index,
-            message: message.into().map(|inner| inner.into()),
-        }
-    }
+	pub fn with_message<M: Into<Cow<'static, str>>, O: Into<Option<M>>>(
+		kind: ErrorKind,
+		line_index: usize,
+		message: O,
+	) -> Self {
+		Self {
+			kind,
+			line_index,
+			message: message.into().map(|inner| inner.into()),
+		}
+	}
 
-    pub fn without_message(kind: ErrorKind, line_index: usize) -> Self {
-        Self {
-            kind,
-            line_index,
-            message: None,
-        }
-    }
+	pub fn without_message(kind: ErrorKind, line_index: usize) -> Self {
+		Self { kind, line_index, message: None }
+	}
 }
 
 impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        if let Some(msg) = &self.message {
-            write!(f, "{} @ ln:{} - {}", self.kind, self.line_index + 1, msg)
-        } else {
-            write!(f, "{} @ ln:{}", self.kind, self.line_index + 1,)
-        }
-    }
+	fn fmt(
+		&self,
+		f: &mut std::fmt::Formatter<'_>,
+	) -> Result<(), std::fmt::Error> {
+		if let Some(msg) = &self.message {
+			write!(f, "{} @ ln:{} - {}", self.kind, self.line_index + 1, msg)
+		} else {
+			write!(f, "{} @ ln:{}", self.kind, self.line_index + 1,)
+		}
+	}
 }
 
 impl std::error::Error for Error {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorKind {
-    Empty,
-    Missing,
-    Invalid,
-    InvalidMagic,
-    InvalidCounts,
-    InvalidVertex,
-    InvalidColor,
-    InvalidFace,
-    LimitExceeded,
+	Empty,
+	Missing,
+	Invalid,
+	InvalidMagic,
+	InvalidCounts,
+	InvalidVertex,
+	InvalidColor,
+	InvalidFace,
+	LimitExceeded,
 }
 
 impl std::fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        std::fmt::Debug::fmt(self, f)
-    }
+	fn fmt(
+		&self,
+		f: &mut std::fmt::Formatter<'_>,
+	) -> Result<(), std::fmt::Error> {
+		std::fmt::Debug::fmt(self, f)
+	}
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(Debug, Clone)]
 pub struct OffLines<'a> {
-    lines: Enumerate<Lines<'a>>,
+	lines: Enumerate<Lines<'a>>,
 }
 
 impl<'a> OffLines<'a> {
-    pub fn new(s: &'a str) -> Self {
-        Self {
-            lines: s.lines().enumerate(),
-        }
-    }
+	pub fn new(s: &'a str) -> Self {
+		Self { lines: s.lines().enumerate() }
+	}
 }
 
 impl<'a> Iterator for OffLines<'a> {
-    type Item = (usize, &'a str);
+	type Item = (usize, &'a str);
 
-    fn next(&mut self) -> Option<Self::Item> {
-        for (line_index, mut line) in self.lines.by_ref() {
-            if let Some(comment_index) = line.find('#') {
-                line = &line[..comment_index];
-            }
+	fn next(&mut self) -> Option<Self::Item> {
+		for (line_index, mut line) in self.lines.by_ref() {
+			if let Some(comment_index) = line.find('#') {
+				line = &line[..comment_index];
+			}
 
-            // Trim after removing comments to prevent the following `Hello # World` => `Hello `
-            // (should be `Hello`)
-            line = line.trim();
+			// Trim after removing comments to prevent the following `Hello # World` => `Hello `
+			// (should be `Hello`)
+			line = line.trim();
 
-            if !line.is_empty() {
-                return Some((line_index, line));
-            }
-        }
+			if !line.is_empty() {
+				return Some((line_index, line));
+			}
+		}
 
-        None
-    }
+		None
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    pub vertex_count: usize,
-    pub face_count: usize,
-    pub face_vertex_count: usize,
+	pub vertex_count: usize,
+	pub face_count: usize,
+	pub face_vertex_count: usize,
 }
 
 impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            vertex_count: 2048,
-            face_count: 4096,
-            face_vertex_count: 128,
-        }
-    }
+	fn default() -> Self {
+		Self { vertex_count: 2048, face_count: 4096, face_vertex_count: 128 }
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParserOptions<C> {
-    pub color_format: C,
-    pub limits: Limits,
+	pub color_format: C,
+	pub limits: Limits,
 }
 
 impl Default for ParserOptions<crate::colorformat::Any> {
-    fn default() -> Self {
-        Self {
-            color_format: crate::colorformat::Any,
-            limits: Default::default(),
-        }
-    }
+	fn default() -> Self {
+		Self {
+			color_format: crate::colorformat::Any,
+			limits: Default::default(),
+		}
+	}
 }
 
 pub struct OffParser<'a, C> {
-    #[allow(unused)]
-    options: ParserOptions<C>,
-    lines: Peekable<OffLines<'a>>,
+	#[allow(unused)]
+	options: ParserOptions<C>,
+	lines: Peekable<OffLines<'a>>,
 }
 
 impl<'a> OffParser<'a, crate::colorformat::Any> {
-    pub fn new<S: AsRef<str>>(s: &'a S) -> Self {
-        let lines = OffLines::new(s.as_ref()).peekable();
+	pub fn new<S: AsRef<str>>(s: &'a S) -> Self {
+		let lines = OffLines::new(s.as_ref()).peekable();
 
-        Self {
-            lines,
-            options: Default::default(),
-        }
-    }
+		Self { lines, options: Default::default() }
+	}
 }
 
 impl<'a, C> OffParser<'a, C>
 where
-    C: ColorFormat,
+	C: ColorFormat,
 {
-    pub fn new_with_options<S: AsRef<str>>(s: &'a S, options: ParserOptions<C>) -> Self {
-        let lines = OffLines::new(s.as_ref()).peekable();
+	pub fn new_with_options<S: AsRef<str>>(
+		s: &'a S,
+		options: ParserOptions<C>,
+	) -> Self {
+		let lines = OffLines::new(s.as_ref()).peekable();
 
-        Self { lines, options }
-    }
+		Self { lines, options }
+	}
 
-    pub fn try_parse(mut self) -> Result<Document<Unchecked>> {
-        let _ = self.try_consume_magic()?;
-        let (vertex_count, face_count, edge_count) = self.try_consume_counts()?;
+	pub fn try_parse(mut self) -> Result<Document<Unchecked>> {
+		let _ = self.try_consume_magic()?;
+		let (vertex_count, face_count, edge_count) =
+			self.try_consume_counts()?;
 
-        if vertex_count > self.options.limits.vertex_count {
-            return Err(Error::with_message(
-                ErrorKind::LimitExceeded,
-                0, // TODO: save last line index
-                format!(
-                    "Vertex count exceeds limit (limit: {}, requested: {})",
-                    self.options.limits.vertex_count, vertex_count
-                ),
-            ));
-        }
+		if vertex_count > self.options.limits.vertex_count {
+			return Err(Error::with_message(
+				ErrorKind::LimitExceeded,
+				0, // TODO: save last line index
+				format!(
+					"Vertex count exceeds limit (limit: {}, requested: {})",
+					self.options.limits.vertex_count, vertex_count
+				),
+			));
+		}
 
-        if face_count > self.options.limits.face_count {
-            return Err(Error::with_message(
-                ErrorKind::LimitExceeded,
-                0, // TODO: save last line index
-                format!(
-                    "Face count exceeds limit (limit: {}, requested: {})",
-                    self.options.limits.face_count, face_count
-                ),
-            ));
-        }
+		if face_count > self.options.limits.face_count {
+			return Err(Error::with_message(
+				ErrorKind::LimitExceeded,
+				0, // TODO: save last line index
+				format!(
+					"Face count exceeds limit (limit: {}, requested: {})",
+					self.options.limits.face_count, face_count
+				),
+			));
+		}
 
-        let vertices = self.try_consume_vertices(vertex_count)?;
-        let faces = self.try_consume_faces(face_count, vertex_count)?;
+		let vertices = self.try_consume_vertices(vertex_count)?;
+		let faces = self.try_consume_faces(face_count, vertex_count)?;
 
-        if let Some((line_index, _)) = self.lines.next() {
-            Err(Error::with_message(
-                ErrorKind::Invalid,
-                line_index,
-                "Unexpected lines after OFF definition",
-            ))
-        } else {
-            Ok(Document::new(vertices, faces, edge_count))
-        }
-    }
+		if let Some((line_index, _)) = self.lines.next() {
+			Err(Error::with_message(
+				ErrorKind::Invalid,
+				line_index,
+				"Unexpected lines after OFF definition",
+			))
+		} else {
+			Ok(Document::new(vertices, faces, edge_count))
+		}
+	}
 
-    fn try_consume_magic(&mut self) -> Result<()> {
-        let (line_index, line) = self
-            .lines
-            .peek()
-            .ok_or_else(|| Error::without_message(ErrorKind::Empty, 0))?;
+	fn try_consume_magic(&mut self) -> Result<()> {
+		let (line_index, line) = self
+			.lines
+			.peek()
+			.ok_or_else(|| Error::without_message(ErrorKind::Empty, 0))?;
 
-        if let Some(suffix) = line.strip_prefix("OFF") {
-            if suffix.is_empty() {
-                // valid magic
-                // consume peeked item
-                let _ = self.lines.next().expect("Next item not present");
-            } else {
-                // trailing characters; invalid magic
-                return Err(Error::with_message(
-                    ErrorKind::InvalidMagic,
-                    *line_index,
-                    "Trailing characters after magic",
-                ));
-            }
-        }
+		if let Some(suffix) = line.strip_prefix("OFF") {
+			if suffix.is_empty() {
+				// valid magic
+				// consume peeked item
+				let _ = self.lines.next().expect("Next item not present");
+			} else {
+				// trailing characters; invalid magic
+				return Err(Error::with_message(
+					ErrorKind::InvalidMagic,
+					*line_index,
+					"Trailing characters after magic",
+				));
+			}
+		}
 
-        Ok(())
-    }
+		Ok(())
+	}
 
-    fn try_consume_counts(&mut self) -> Result<(usize, usize, Option<u64>)> {
-        let (line_index, line) = self.lines.next().ok_or_else(|| {
-            Error::with_message(
-                ErrorKind::Missing,
-                0,
-                "No counts for vertices, faces and edges present",
-            )
-        })?;
+	fn try_consume_counts(&mut self) -> Result<(usize, usize, Option<u64>)> {
+		let (line_index, line) = self.lines.next().ok_or_else(|| {
+			Error::with_message(
+				ErrorKind::Missing,
+				0,
+				"No counts for vertices, faces and edges present",
+			)
+		})?;
 
-        let counts = line
-            .split_whitespace()
-            .map(|w| w.parse::<usize>())
-            // Take one more than we expect/want so that we can check bellow
-            // if we got the expected amount or more.
-            .take(4)
-            .collect::<Result<Vec<usize>, _>>()
-            .map_err(|err| {
-                Error::with_message(
-                    ErrorKind::InvalidCounts,
-                    line_index,
-                    format!("Failed to parse count as number ({})", err),
-                )
-            })?;
+		let counts = line
+			.split_whitespace()
+			.map(|w| w.parse::<usize>())
+			// Take one more than we expect/want so that we can check bellow
+			// if we got the expected amount or more.
+			.take(4)
+			.collect::<Result<Vec<usize>, _>>()
+			.map_err(|err| {
+				Error::with_message(
+					ErrorKind::InvalidCounts,
+					line_index,
+					format!("Failed to parse count as number ({})", err),
+				)
+			})?;
 
-        match counts[..] {
-            [vertices, faces, edges] => Ok((vertices, faces, Some(edges as u64))),
-            [vertices, faces] => Ok((vertices, faces, None)),
-            _ => Err(Error::with_message(
-                ErrorKind::InvalidCounts,
-                line_index,
-                format!(
-                    "Invalid number of counts given (expected: 2-3, actual: {})",
-                    counts.len()
-                ),
-            )),
-        }
-    }
+		match counts[..] {
+			[vertices, faces, edges] => {
+				Ok((vertices, faces, Some(edges as u64)))
+			}
+			[vertices, faces] => Ok((vertices, faces, None)),
+			_ => Err(Error::with_message(
+				ErrorKind::InvalidCounts,
+				line_index,
+				format!(
+					"Invalid number of counts given (expected: 2-3, actual: \
+					 {})",
+					counts.len()
+				),
+			)),
+		}
+	}
 
-    fn try_consume_vertices(&mut self, vertex_count: usize) -> Result<Vec<Vertex>> {
-        (0..vertex_count)
-            .map(|_| self.try_consume_vertex())
-            .collect()
-    }
+	fn try_consume_vertices(
+		&mut self,
+		vertex_count: usize,
+	) -> Result<Vec<Vertex>> {
+		(0..vertex_count).map(|_| self.try_consume_vertex()).collect()
+	}
 
-    fn try_consume_vertex(&mut self) -> Result<Vertex> {
-        let (line_index, line) = self
-            .lines
-            .next()
-            .ok_or_else(|| Error::with_message(ErrorKind::Missing, 0, "Expected vertex"))?;
+	fn try_consume_vertex(&mut self) -> Result<Vertex> {
+		let (line_index, line) = self.lines.next().ok_or_else(|| {
+			Error::with_message(ErrorKind::Missing, 0, "Expected vertex")
+		})?;
 
-        let coords = line
-            .split_whitespace()
-            .map(|w| w.parse::<f32>())
-            // Take one more than we expect/want so that we can check bellow
-            // if we got the expected amount or more.
-            .take(4)
-            .collect::<Result<Vec<f32>, _>>()
-            .map_err(|err| {
-                Error::with_message(
-                    ErrorKind::InvalidVertex,
-                    line_index,
-                    format!("Failed to parse coordinate as number ({})", err),
-                )
-            })?;
+		let coords = line
+			.split_whitespace()
+			.map(|w| w.parse::<f32>())
+			// Take one more than we expect/want so that we can check bellow
+			// if we got the expected amount or more.
+			.take(4)
+			.collect::<Result<Vec<f32>, _>>()
+			.map_err(|err| {
+				Error::with_message(
+					ErrorKind::InvalidVertex,
+					line_index,
+					format!("Failed to parse coordinate as number ({})", err),
+				)
+			})?;
 
-        if let [x, y, z] = coords[..] {
-            Ok(Vertex::new(x, y, z))
-        } else {
-            Err(Error::with_message(
-                ErrorKind::InvalidVertex,
-                line_index,
-                format!(
-                    "Invalid number of coordinates given (expected: 3, actual: {})",
-                    coords.len()
-                ),
-            ))
-        }
-    }
+		if let [x, y, z] = coords[..] {
+			Ok(Vertex::new(x, y, z))
+		} else {
+			Err(Error::with_message(
+				ErrorKind::InvalidVertex,
+				line_index,
+				format!(
+					"Invalid number of coordinates given (expected: 3, \
+					 actual: {})",
+					coords.len()
+				),
+			))
+		}
+	}
 
-    fn try_consume_faces(
-        &mut self,
-        face_count: usize,
-        vertex_count: usize,
-    ) -> Result<Vec<FaceRef>> {
-        (0..face_count)
-            .map(|_| self.try_consume_face(vertex_count))
-            .collect()
-    }
+	fn try_consume_faces(
+		&mut self,
+		face_count: usize,
+		vertex_count: usize,
+	) -> Result<Vec<FaceRef>> {
+		(0..face_count).map(|_| self.try_consume_face(vertex_count)).collect()
+	}
 
-    fn try_consume_face(&mut self, vertex_count: usize) -> Result<FaceRef> {
-        let (line_index, line) = self
-            .lines
-            .next()
-            .ok_or_else(|| Error::with_message(ErrorKind::Missing, 0, "Expected face"))?;
+	fn try_consume_face(&mut self, vertex_count: usize) -> Result<FaceRef> {
+		let (line_index, line) = self.lines.next().ok_or_else(|| {
+			Error::with_message(ErrorKind::Missing, 0, "Expected face")
+		})?;
 
-        let mut words = line.split_whitespace();
+		let mut words = line.split_whitespace();
 
-        let vertex_index_count = words
-            .next()
-            .ok_or_else(|| {
-                Error::with_message(
-                    ErrorKind::InvalidFace,
-                    line_index,
-                    "Expected number of vertices",
-                )
-            })?
-            .parse::<usize>()
-            .map_err(|err| {
-                Error::with_message(
-                    ErrorKind::InvalidFace,
-                    line_index,
-                    format!("Failed to parse vertex count as number ({})", err),
-                )
-            })?;
+		let vertex_index_count = words
+			.next()
+			.ok_or_else(|| {
+				Error::with_message(
+					ErrorKind::InvalidFace,
+					line_index,
+					"Expected number of vertices",
+				)
+			})?
+			.parse::<usize>()
+			.map_err(|err| {
+				Error::with_message(
+					ErrorKind::InvalidFace,
+					line_index,
+					format!(
+						"Failed to parse vertex count as number ({})",
+						err
+					),
+				)
+			})?;
 
-        if vertex_index_count > self.options.limits.face_vertex_count {
-            return Err(Error::with_message(
-                ErrorKind::LimitExceeded,
-                line_index,
-                format!(
-                    "Vertex count of face exceeds limit (limit: {}, requested: {})",
-                    self.options.limits.face_vertex_count, vertex_index_count
-                ),
-            ));
-        }
+		if vertex_index_count > self.options.limits.face_vertex_count {
+			return Err(Error::with_message(
+				ErrorKind::LimitExceeded,
+				line_index,
+				format!(
+					"Vertex count of face exceeds limit (limit: {}, \
+					 requested: {})",
+					self.options.limits.face_vertex_count, vertex_index_count
+				),
+			));
+		}
 
-        let mut vertex_indexes = Vec::with_capacity(vertex_index_count);
+		let mut vertex_indexes = Vec::with_capacity(vertex_index_count);
 
-        for i in 0..vertex_index_count {
-            let vertex_index = words
-                .next()
-                .ok_or_else(|| {
-                    Error::with_message(
-                        ErrorKind::InvalidFace,
-                        line_index,
-                        format!("Expected vertex index ({}/{})", i, vertex_index_count),
-                    )
-                })?
-                .parse::<usize>()
-                .map_err(|err| {
-                    Error::with_message(
-                        ErrorKind::InvalidFace,
-                        line_index,
-                        format!(
-                            "Failed to parse vertex index as number ({}/{}; {})",
-                            i, vertex_index_count, err
-                        ),
-                    )
-                })?;
+		for i in 0..vertex_index_count {
+			let vertex_index = words
+				.next()
+				.ok_or_else(|| {
+					Error::with_message(
+						ErrorKind::InvalidFace,
+						line_index,
+						format!(
+							"Expected vertex index ({}/{})",
+							i, vertex_index_count
+						),
+					)
+				})?
+				.parse::<usize>()
+				.map_err(|err| {
+					Error::with_message(
+						ErrorKind::InvalidFace,
+						line_index,
+						format!(
+							"Failed to parse vertex index as number ({}/{}; \
+							 {})",
+							i, vertex_index_count, err
+						),
+					)
+				})?;
 
-            if vertex_index >= vertex_count {
-                return Err(Error::with_message(
-                    ErrorKind::InvalidFace,
-                    line_index,
-                    format!(
-                        "Vertex index out of bounds ({}/{})",
-                        vertex_index, vertex_count
-                    ),
-                ));
-            }
+			if vertex_index >= vertex_count {
+				return Err(Error::with_message(
+					ErrorKind::InvalidFace,
+					line_index,
+					format!(
+						"Vertex index out of bounds ({}/{})",
+						vertex_index, vertex_count
+					),
+				));
+			}
 
-            vertex_indexes.push(VertexRef(vertex_index));
-        }
+			vertex_indexes.push(VertexRef(vertex_index));
+		}
 
-        // Check for color
-        let mut words = words.peekable();
+		// Check for color
+		let mut words = words.peekable();
 
-        let color = if words.peek().is_some() {
-            if let Some(res) = C::try_parse(&mut words) {
-                Some(res.map_err(|err| {
-                    Error::with_message(ErrorKind::InvalidColor, line_index, err.to_string())
-                })?)
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+		let color = if words.peek().is_some() {
+			if let Some(res) = C::try_parse(&mut words) {
+				Some(res.map_err(|err| {
+					Error::with_message(
+						ErrorKind::InvalidColor,
+						line_index,
+						err.to_string(),
+					)
+				})?)
+			} else {
+				None
+			}
+		} else {
+			None
+		};
 
-        if words.next().is_some() {
-            Err(Error::with_message(
-                ErrorKind::Invalid,
-                line_index,
-                "Found elements after color definition",
-            ))
-        } else {
-            Ok(FaceRef {
-                vertex_refs: vertex_indexes,
-                color,
-            })
-        }
-    }
+		if words.next().is_some() {
+			Err(Error::with_message(
+				ErrorKind::Invalid,
+				line_index,
+				"Found elements after color definition",
+			))
+		} else {
+			Ok(FaceRef { vertex_refs: vertex_indexes, color })
+		}
+	}
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::colorformat::{RgbU8, RgbaF32};
+	use super::*;
+	use crate::colorformat::{RgbU8, RgbaF32};
 
-    use super::*;
-
-    #[test]
-    fn wiki() {
-        let content = r#"OFF
+	#[test]
+	fn wiki() {
+		let content = r#"OFF
 # cube.off
 # A cube
  
@@ -458,19 +463,17 @@ mod tests {
 4  3 2 6 7  0 0 255
 4  6 5 4 7  255 0 0"#;
 
-        let options = ParserOptions {
-            color_format: RgbU8,
-            limits: Default::default(),
-        };
-        let parser = OffParser::new_with_options(&content, options);
-        let document = parser.try_parse().unwrap();
+		let options =
+			ParserOptions { color_format: RgbU8, limits: Default::default() };
+		let parser = OffParser::new_with_options(&content, options);
+		let document = parser.try_parse().unwrap();
 
-        println!("{:#?}", document);
-    }
+		println!("{:#?}", document);
+	}
 
-    #[test]
-    fn spec_example() {
-        let content = r#"
+	#[test]
+	fn spec_example() {
+		let content = r#"
 OFF
 #
 #  cube.off
@@ -494,33 +497,33 @@ OFF
   4  6 5 4 7  0.000 1.000 0.000 0.75
 "#;
 
-        let options = ParserOptions {
-            color_format: RgbaF32,
-            limits: Default::default(),
-        };
-        let parser = OffParser::new_with_options(&content, options);
-        let document = parser.try_parse().unwrap();
+		let options = ParserOptions {
+			color_format: RgbaF32,
+			limits: Default::default(),
+		};
+		let parser = OffParser::new_with_options(&content, options);
+		let document = parser.try_parse().unwrap();
 
-        println!("{:#?}", document);
+		println!("{:#?}", document);
 
-        let checked = document.validate().unwrap();
+		let checked = document.validate().unwrap();
 
-        for face in checked.face_iter() {
-            println!("F: {:?}", face);
-        }
-    }
+		for face in checked.face_iter() {
+			println!("F: {:?}", face);
+		}
+	}
 
-    #[test]
-    fn parse_resources() {
-        for res in std::fs::read_dir("resources").unwrap() {
-            let res = res.expect("Failed to get resources");
-            let content = std::fs::read_to_string(res.path())
-                .expect(&format!("Failed to read: {}", res.path().display()));
+	#[test]
+	fn parse_resources() {
+		for res in std::fs::read_dir("resources").unwrap() {
+			let res = res.expect("Failed to get resources");
+			let content = std::fs::read_to_string(res.path())
+				.expect(&format!("Failed to read: {}", res.path().display()));
 
-            let parser = OffParser::new(&content);
-            let _ = parser
-                .try_parse()
-                .expect(&format!("Failed to parse: {}", res.path().display()));
-        }
-    }
+			let parser = OffParser::new(&content);
+			let _ = parser
+				.try_parse()
+				.expect(&format!("Failed to parse: {}", res.path().display()));
+		}
+	}
 }
